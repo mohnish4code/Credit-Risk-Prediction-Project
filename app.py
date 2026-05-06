@@ -1,35 +1,108 @@
-# import streamlit as st
-# import pandas as pd
-# import sys, os
+import streamlit as st
+import pandas as pd
+import sys, os
 
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Fix import path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from src.predict import predict, predict_proba
 
-# from src.predict import predict, predict_proba
+# Page config
+st.set_page_config(
+    page_title="Credit Risk Predictor",
+    page_icon="💳",
+    layout="wide"
+)
 
-# st.title("💳 Credit Risk Prediction System")
+# Custom CSS (clean dark fintech style)
+st.markdown("""
+<style>
+.main {
+    background-color: #0E1117;
+}
+.stButton>button {
+    background: linear-gradient(90deg, #00C9FF, #92FE9D);
+    color: black;
+    border-radius: 10px;
+    height: 3em;
+    width: 100%;
+    font-weight: bold;
+    font-size: 16px;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# st.write("Enter Customer Details")
+# Title
+st.title("💳 Credit Risk Prediction System")
+st.markdown("### Loan Risk Assessment")
 
-# income = st.number_input("Income")
-# loan = st.number_input("Loan Amount")
-# age = st.number_input("Age")
+st.markdown("---")
 
-# home = st.selectbox("Home Ownership", ["RENT", "OWN", "MORTGAGE"])
-# intent = st.selectbox("Loan Intent", ["PERSONAL", "EDUCATION", "VENTURE"])
+# Layout (2 columns)
+col1, col2 = st.columns(2)
 
-# if st.button("Predict"):
-#     input_df = pd.DataFrame({
-#         "income": [income],
-#         "loan_amnt": [loan],
-#         "age": [age],
-#         "person_home_ownership": [home],
-#         "loan_intent": [intent]
-#     })
+with col1:
+    st.subheader("📊 Loan Details")
+    loan = st.number_input("💰 Loan Amount", min_value=0.0)
+    loan_int_rate = st.number_input("📈 Interest Rate (%)", min_value=0.0)
+    loan_percent_income = st.slider(
+        "📊 Loan % of Income",
+        min_value=0.0,
+        max_value=1.0,
+        step=0.01
+    )
 
-#     result = predict(input_df)[0]
-#     prob = predict_proba(input_df)[0][1]
+with col2:
+    st.subheader("👤 Customer Profile")
+    home = st.selectbox(
+        "🏠 Home Ownership",
+        ["RENT", "OWN", "MORTGAGE"]
+    )
+    intent = st.selectbox(
+        "🎯 Loan Purpose",
+        ["PERSONAL", "EDUCATION", "VENTURE"]
+    )
 
-#     if result == 1:
-#         st.error(f"High Risk ❌ (Risk Score: {prob:.2f})")
-#     else:
-#         st.success(f"Low Risk ✅ (Risk Score: {prob:.2f})")
+st.markdown("---")
+
+# Prediction
+if st.button("🔍 Predict Risk"):
+
+    input_df = pd.DataFrame({
+        "loan_intent": [intent],
+        "person_home_ownership": [home],
+        "loan_amnt": [loan],
+        "loan_int_rate": [loan_int_rate],
+        "loan_percent_income": [loan_percent_income]
+    })
+
+    result = predict(input_df)[0]
+    prob = predict_proba(input_df)[0][1]
+
+    st.markdown("## 📈 Prediction Result")
+
+    if result == 1:
+        st.error(f"⚠️ High Risk Customer")
+        st.progress(float(prob))
+        st.write(f"### Risk Probability: **{prob:.2%}**")
+    else:
+        st.success(f"✅ Low Risk Customer")
+        st.progress(float(prob))
+        st.write(f"### Risk Probability: **{prob:.2%}**")
+
+st.markdown("---")
+
+# Info section
+with st.expander("ℹ️ About Model"):
+    st.write("""
+    - Model: XGBoost Classifier  
+    - Features Used:
+        - Loan Intent  
+        - Home Ownership  
+        - Loan Amount  
+        - Interest Rate  
+        - Loan % of Income  
+    - Pipeline includes preprocessing + encoding + scaling
+    """)
+
+# Footer
+st.caption("Built with using Streamlit | Credit Risk ML System")

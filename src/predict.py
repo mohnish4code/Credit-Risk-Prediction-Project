@@ -1,9 +1,14 @@
 import pickle
+import os
 import pandas as pd
 
 def model_loading():
-    with open("models/model.pkl", "rb") as f:
+    path = "models/model.pkl"
+    print("Loading model from:", os.path.abspath(path))
+    
+    with open(path, "rb") as f:
         return pickle.load(f)
+
     
 model = model_loading()
 

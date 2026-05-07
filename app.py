@@ -11,7 +11,7 @@ sys.path.append(
     )
 )
 
-from src.predict import predict, predict_proba
+from src.predict import predict_proba
 
 # ---------------- PAGE CONFIG ---------------- #
 
@@ -138,30 +138,26 @@ with col2:
 
 st.markdown("---")
 
-# ---------------- VALIDATION ---------------- #
+# ---------------- VALIDATION WARNINGS ---------------- #
+
+if loan_percent_income > 0.83:
+
+    st.warning(
+        "⚠️ This loan percentage exceeds the "
+        "training data distribution range. "
+        "Prediction confidence may be lower."
+    )
 
 if loan_amnt > person_income:
 
-    st.error(
-        "❌ Loan amount cannot exceed annual income."
-    )
-
-elif loan_percent_income > 0.83:
-
-    st.warning(
-        "⚠️ Loan percentage exceeds the training "
-        "data distribution range. Prediction "
-        "may be unreliable."
+    st.info(
+        "ℹ️ Loan amount exceeds annual income. "
+        "Such cases may carry higher financial risk."
     )
 
 # ---------------- PREDICTION ---------------- #
 
 if st.button("🔍 Predict Credit Risk"):
-
-    # Stop invalid unrealistic inputs
-    if loan_amnt > person_income:
-
-        st.stop()
 
     input_df = pd.DataFrame({
 
@@ -193,50 +189,64 @@ if st.button("🔍 Predict Credit Risk"):
 
     })
 
-    prediction = predict(input_df)[0]
-
     probabilities = predict_proba(input_df)[0]
 
     low_risk_prob = probabilities[0]
     high_risk_prob = probabilities[1]
 
-    st.markdown("## 📈 Prediction Result")
+    # ---------------- RISK CATEGORY ---------------- #
 
-    # ---------------- HIGH RISK ---------------- #
+    if high_risk_prob < 0.30:
 
-    if prediction == 1:
+        risk_category = "🟢 Low Risk"
 
-        st.error("⚠️ High Risk Customer")
+    elif high_risk_prob < 0.60:
 
-        st.progress(float(high_risk_prob))
-
-        st.markdown(
-            f"### High Risk Probability: "
-            f"**{high_risk_prob:.2%}**"
-        )
-
-        st.warning("""
-        This applicant may have a higher
-        probability of loan default based on
-        financial and credit characteristics.
-        """)
-
-    # ---------------- LOW RISK ---------------- #
+        risk_category = "🟡 Medium Risk"
 
     else:
 
-        st.success("✅ Low Risk Customer")
+        risk_category = "🔴 High Risk"
 
-        st.progress(float(low_risk_prob))
+    # ---------------- RESULT DISPLAY ---------------- #
 
-        st.markdown(
-            f"### Low Risk Probability: "
-            f"**{low_risk_prob:.2%}**"
-        )
+    st.markdown("## 📈 Prediction Result")
 
-        st.info("""
+    st.metric(
+        label="Risk Category",
+        value=risk_category
+    )
+
+    st.progress(float(high_risk_prob))
+
+    st.markdown(
+        f"### High Risk Probability: "
+        f"**{high_risk_prob:.2%}**"
+    )
+
+    # ---------------- RESULT MESSAGE ---------------- #
+
+    if high_risk_prob < 0.30:
+
+        st.success("""
         This applicant appears financially safer
         according to the trained ML model.
+        """)
+
+    elif high_risk_prob < 0.60:
+
+        st.warning("""
+        This applicant shows moderate financial
+        risk characteristics. Further evaluation
+        may be recommended.
+        """)
+
+    else:
+
+        st.error("""
+        This applicant may have a higher probability
+        of loan default based on financial and
+        credit characteristics.
         """)
 
 st.markdown("---")

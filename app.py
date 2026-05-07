@@ -88,7 +88,7 @@ with col1:
         step=0.1
     )
 
-    # Automatically calculate loan percentage income
+    # Automatically calculate loan percentage
     loan_percent_income = loan_amnt / person_income
 
     st.metric(
@@ -138,9 +138,30 @@ with col2:
 
 st.markdown("---")
 
+# ---------------- VALIDATION ---------------- #
+
+if loan_amnt > person_income:
+
+    st.error(
+        "❌ Loan amount cannot exceed annual income."
+    )
+
+elif loan_percent_income > 0.83:
+
+    st.warning(
+        "⚠️ Loan percentage exceeds the training "
+        "data distribution range. Prediction "
+        "may be unreliable."
+    )
+
 # ---------------- PREDICTION ---------------- #
 
 if st.button("🔍 Predict Credit Risk"):
+
+    # Stop invalid unrealistic inputs
+    if loan_amnt > person_income:
+
+        st.stop()
 
     input_df = pd.DataFrame({
 
@@ -174,7 +195,10 @@ if st.button("🔍 Predict Credit Risk"):
 
     prediction = predict(input_df)[0]
 
-    probability = predict_proba(input_df)[0][1]
+    probabilities = predict_proba(input_df)[0]
+
+    low_risk_prob = probabilities[0]
+    high_risk_prob = probabilities[1]
 
     st.markdown("## 📈 Prediction Result")
 
@@ -184,11 +208,11 @@ if st.button("🔍 Predict Credit Risk"):
 
         st.error("⚠️ High Risk Customer")
 
-        st.progress(float(probability))
+        st.progress(float(high_risk_prob))
 
         st.markdown(
-            f"### Risk Probability: "
-            f"**{probability:.2%}**"
+            f"### High Risk Probability: "
+            f"**{high_risk_prob:.2%}**"
         )
 
         st.warning("""
@@ -203,11 +227,11 @@ if st.button("🔍 Predict Credit Risk"):
 
         st.success("✅ Low Risk Customer")
 
-        st.progress(float(probability))
+        st.progress(float(low_risk_prob))
 
         st.markdown(
-            f"### Risk Probability: "
-            f"**{probability:.2%}**"
+            f"### Low Risk Probability: "
+            f"**{low_risk_prob:.2%}**"
         )
 
         st.info("""
@@ -226,8 +250,8 @@ with st.expander("ℹ️ About This Model"):
 ### 🔹 Model Information
 
 - Model: XGBoost Classifier
-- Type: Binary Classification
-- Purpose: Credit Risk Prediction
+- Task: Credit Risk Classification
+- Type: Supervised Machine Learning
 
 ### 🔹 Features Used
 
@@ -244,14 +268,22 @@ with st.expander("ℹ️ About This Model"):
 ### 🔹 Pipeline Includes
 
 - Data preprocessing
-- Feature encoding
-- Scaling
-- Model prediction pipeline
+- Encoding categorical variables
+- Feature scaling
+- XGBoost prediction pipeline
 
-### 🔹 Performance
+### 🔹 Model Performance
 
 - Accuracy: ~93%
 - ROC-AUC Score: ~0.85
+- Evaluated using confusion matrix,
+  precision, recall, and F1-score
+
+### 🔹 Important Note
+
+Predictions may become less reliable
+for unrealistic financial inputs outside
+the training distribution range.
 
 """)
 

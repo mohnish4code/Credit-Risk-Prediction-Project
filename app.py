@@ -18,7 +18,7 @@ from src.predict import predict_proba
 st.set_page_config(
     page_title="Credit Risk Predictor",
     page_icon="💳",
-    layout="wide"
+    layout="centered"
 )
 
 # ---------------- CUSTOM CSS ---------------- #
@@ -30,7 +30,7 @@ st.markdown("""
     background-color: #0E1117;
 }
 
-h1, h2, h3 {
+h1, h2, h3, h4 {
     color: white;
 }
 
@@ -49,25 +49,30 @@ h1, h2, h3 {
     opacity: 0.9;
 }
 
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------- TITLE ---------------- #
 
-st.title("💳 Credit Risk Prediction System")
-st.markdown("### AI-Based Loan Risk Assessment")
+st.title("💳 Credit Risk Prediction")
+st.markdown(
+    "AI-powered loan risk assessment system"
+)
 
 st.markdown("---")
 
-# ---------------- LAYOUT ---------------- #
+# ---------------- INPUT SECTION ---------------- #
+
+st.subheader("📋 Applicant Information")
 
 col1, col2 = st.columns(2)
 
-# ---------------- COLUMN 1 ---------------- #
-
 with col1:
-
-    st.subheader("📊 Financial Information")
 
     person_income = st.number_input(
         "💵 Annual Income",
@@ -88,19 +93,14 @@ with col1:
         step=0.1
     )
 
-    # Automatically calculate loan percentage
-    loan_percent_income = loan_amnt / person_income
-
-    st.metric(
-        label="📊 Loan Percentage of Income",
-        value=f"{loan_percent_income:.2%}"
+    cb_person_cred_hist_length = st.slider(
+        "📅 Credit History Length",
+        min_value=1,
+        max_value=30,
+        value=5
     )
 
-# ---------------- COLUMN 2 ---------------- #
-
 with col2:
-
-    st.subheader("👤 Applicant Profile")
 
     person_home_ownership = st.selectbox(
         "🏠 Home Ownership",
@@ -125,34 +125,28 @@ with col2:
     )
 
     cb_person_default_on_file = st.selectbox(
-        "⚠️ Previous Loan Default",
+        "⚠️ Previous Default",
         ["N", "Y"]
     )
 
-    cb_person_cred_hist_length = st.slider(
-        "📅 Credit History Length (Years)",
-        min_value=1,
-        max_value=30,
-        value=5
-    )
+# ---------------- DERIVED FEATURE ---------------- #
+
+loan_percent_income = loan_amnt / person_income
 
 st.markdown("---")
 
-# ---------------- WARNINGS ---------------- #
+st.metric(
+    label="📊 Loan Percentage of Income",
+    value=f"{loan_percent_income:.2%}"
+)
+
+# ---------------- LIGHT WARNINGS ---------------- #
 
 if loan_percent_income > 0.83:
 
     st.warning(
-        "⚠️ This loan percentage exceeds the "
-        "training data distribution range. "
+        "This loan ratio exceeds most training data examples. "
         "Prediction confidence may be lower."
-    )
-
-if loan_amnt > person_income:
-
-    st.info(
-        "ℹ️ Loan amount exceeds annual income. "
-        "Such loans generally carry higher financial risk."
     )
 
 # ---------------- PREDICTION ---------------- #
@@ -189,55 +183,39 @@ if st.button("🔍 Predict Credit Risk"):
 
     })
 
-    # ---------------- MODEL PROBABILITIES ---------------- #
+    # ---------------- MODEL PREDICTION ---------------- #
 
     probabilities = predict_proba(input_df)[0]
 
-    low_risk_prob = probabilities[0]
     high_risk_prob = probabilities[1]
 
-    # =====================================================
-    # BUSINESS RULE ADJUSTMENTS
-    # =====================================================
+    # ---------------- BUSINESS RULE ADJUSTMENT ---------------- #
 
     adjustment_score = 0
 
-    # High loan burden
     if loan_percent_income > 0.50:
         adjustment_score += 0.15
 
-    # Extremely high loan burden
     if loan_percent_income > 0.75:
         adjustment_score += 0.20
 
-    # Previous default
     if cb_person_default_on_file == "Y":
         adjustment_score += 0.20
 
-    # Risky loan grades
     if loan_grade in ["D", "E", "F", "G"]:
         adjustment_score += 0.15
 
-    # Very short credit history
     if cb_person_cred_hist_length <= 2:
         adjustment_score += 0.10
 
-    # RENT ownership slightly risky
     if person_home_ownership == "RENT":
         adjustment_score += 0.05
 
-    # High interest rate
     if loan_int_rate > 15:
         adjustment_score += 0.10
 
-    # Venture loans slightly risky
-    if loan_intent == "VENTURE":
-        adjustment_score += 0.05
-
-    # Apply adjustment
     adjusted_prob = high_risk_prob + adjustment_score
 
-    # Clamp probability
     adjusted_prob = min(max(adjusted_prob, 0), 1)
 
     # ---------------- RISK CATEGORY ---------------- #
@@ -246,17 +224,34 @@ if st.button("🔍 Predict Credit Risk"):
 
         risk_category = "🟢 Low Risk"
 
+        message = (
+            "This applicant appears financially "
+            "stable according to the risk model."
+        )
+
     elif adjusted_prob < 0.70:
 
         risk_category = "🟡 Medium Risk"
+
+        message = (
+            "This applicant shows moderate "
+            "financial risk characteristics."
+        )
 
     else:
 
         risk_category = "🔴 High Risk"
 
+        message = (
+            "This applicant may have a higher "
+            "probability of loan default."
+        )
+
     # ---------------- RESULT DISPLAY ---------------- #
 
-    st.markdown("## 📈 Prediction Result")
+    st.markdown("---")
+
+    st.subheader("📈 Prediction Result")
 
     st.metric(
         label="Risk Category",
@@ -266,129 +261,55 @@ if st.button("🔍 Predict Credit Risk"):
     st.progress(float(adjusted_prob))
 
     st.markdown(
-        f"### Adjusted High Risk Probability: "
+        f"### Risk Confidence: "
         f"**{adjusted_prob:.2%}**"
     )
 
-    # ---------------- DETAILED RESULT ---------------- #
+    st.info(message)
 
-    if adjusted_prob < 0.40:
-
-        st.success("""
-        This applicant appears financially safer
-        according to the ML model and financial rules.
-        """)
-
-    elif adjusted_prob < 0.70:
-
-        st.warning("""
-        This applicant shows moderate financial
-        risk characteristics. Additional review
-        may be recommended.
-        """)
-
-    else:
-
-        st.error("""
-        This applicant may have a higher probability
-        of loan default based on ML prediction and
-        financial risk indicators.
-        """)
-
-    # ---------------- EXPANDABLE DETAILS ---------------- #
-
-    with st.expander("📋 Risk Analysis Details"):
-
-        st.write(f"Base ML High Risk Probability: {high_risk_prob:.2%}")
-        st.write(f"Business Rule Adjustment: +{adjustment_score:.2%}")
-        st.write(f"Final Adjusted Probability: {adjusted_prob:.2%}")
-
-        st.markdown("### Financial Risk Factors Considered")
-
-        risk_factors = []
-
-        if loan_percent_income > 0.50:
-            risk_factors.append("High loan-to-income burden")
-
-        if cb_person_default_on_file == "Y":
-            risk_factors.append("Previous default history")
-
-        if loan_grade in ["D", "E", "F", "G"]:
-            risk_factors.append("Risky loan grade")
-
-        if cb_person_cred_hist_length <= 2:
-            risk_factors.append("Short credit history")
-
-        if person_home_ownership == "RENT":
-            risk_factors.append("Rental home ownership")
-
-        if loan_int_rate > 15:
-            risk_factors.append("High interest rate")
-
-        if loan_intent == "VENTURE":
-            risk_factors.append("Business/Venture loan purpose")
-
-        if len(risk_factors) == 0:
-            st.success("No major financial risk indicators detected.")
-
-        else:
-            for factor in risk_factors:
-                st.write(f"• {factor}")
+# ---------------- ABOUT SECTION ---------------- #
 
 st.markdown("---")
-
-# ---------------- ABOUT MODEL ---------------- #
 
 with st.expander("ℹ️ About This Model"):
 
     st.write("""
 
-### 🔹 Model Information
+### Model Information
 
 - Model: XGBoost Classifier
-- Type: Credit Risk Classification
+- Task: Credit Risk Classification
 - Deployment: Streamlit
 
-### 🔹 Features Used
+### Features Used
 
 - Annual Income
-- Home Ownership
-- Loan Purpose
 - Loan Amount
 - Interest Rate
-- Loan Percentage of Income
+- Home Ownership
+- Loan Purpose
 - Loan Grade
 - Previous Default History
 - Credit History Length
+- Loan Percentage of Income
 
-### 🔹 System Design
-
-This system combines:
-
-1. Machine Learning Predictions
-2. Financial Rule-Based Adjustments
-3. Risk Categorization Logic
-
-to improve practical financial risk interpretation.
-
-### 🔹 Evaluation Metrics
+### Model Performance
 
 - Accuracy: ~93%
 - ROC-AUC Score: ~0.85
-- Evaluated using confusion matrix,
-  precision, recall, and F1-score
 
-### 🔹 Important Note
+### Note
 
-Predictions are based on patterns learned
-from historical training data and may become
-less reliable for highly unrealistic financial inputs.
+This system combines:
+- Machine Learning predictions
+- Financial risk adjustment rules
+
+to improve practical credit risk assessment.
 
 """)
 
 # ---------------- FOOTER ---------------- #
 
 st.caption(
-    "🚀 Built with Streamlit | "
-    "AI-Powered Credit Risk Prediction System"
+    "Built with Streamlit | AI-Based Credit Risk Prediction System"
 )

@@ -72,6 +72,8 @@ st.subheader("📋 Applicant Information")
 
 col1, col2 = st.columns(2)
 
+# ---------------- COLUMN 1 ---------------- #
+
 with col1:
 
     person_income = st.number_input(
@@ -99,6 +101,8 @@ with col1:
         max_value=30,
         value=5
     )
+
+# ---------------- COLUMN 2 ---------------- #
 
 with col2:
 
@@ -140,7 +144,7 @@ st.metric(
     value=f"{loan_percent_income:.2%}"
 )
 
-# ---------------- LIGHT WARNINGS ---------------- #
+# ---------------- LIGHT WARNING ---------------- #
 
 if loan_percent_income > 0.83:
 
@@ -183,40 +187,40 @@ if st.button("🔍 Predict Credit Risk"):
 
     })
 
-    # ---------------- MODEL PREDICTION ---------------- #
+    # ---------------- MODEL PROBABILITY ---------------- #
 
     probabilities = predict_proba(input_df)[0]
 
     high_risk_prob = probabilities[1]
 
-    # ---------------- BUSINESS RULE ADJUSTMENT ---------------- #
+    # ---------------- SOFT BUSINESS RULES ---------------- #
 
     adjustment_score = 0
 
     if loan_percent_income > 0.50:
-        adjustment_score += 0.15
-
-    if loan_percent_income > 0.75:
-        adjustment_score += 0.20
-
-    if cb_person_default_on_file == "Y":
-        adjustment_score += 0.20
-
-    if loan_grade in ["D", "E", "F", "G"]:
-        adjustment_score += 0.15
-
-    if cb_person_cred_hist_length <= 2:
-        adjustment_score += 0.10
-
-    if person_home_ownership == "RENT":
         adjustment_score += 0.05
 
+    if loan_percent_income > 0.75:
+        adjustment_score += 0.08
+
+    if cb_person_default_on_file == "Y":
+        adjustment_score += 0.07
+
+    if loan_grade in ["D", "E", "F", "G"]:
+        adjustment_score += 0.05
+
+    if cb_person_cred_hist_length <= 2:
+        adjustment_score += 0.03
+
+    if person_home_ownership == "RENT":
+        adjustment_score += 0.02
+
     if loan_int_rate > 15:
-        adjustment_score += 0.10
+        adjustment_score += 0.04
 
     adjusted_prob = high_risk_prob + adjustment_score
 
-    adjusted_prob = min(max(adjusted_prob, 0), 1)
+    adjusted_prob = min(adjusted_prob, 0.95)
 
     # ---------------- RISK CATEGORY ---------------- #
 
@@ -224,14 +228,18 @@ if st.button("🔍 Predict Credit Risk"):
 
         risk_category = "🟢 Low Risk"
 
+        confidence = "Moderate"
+
         message = (
-            "This applicant appears financially "
-            "stable according to the risk model."
+            "This applicant appears financially stable "
+            "according to the risk model."
         )
 
     elif adjusted_prob < 0.70:
 
         risk_category = "🟡 Medium Risk"
+
+        confidence = "High"
 
         message = (
             "This applicant shows moderate "
@@ -242,12 +250,14 @@ if st.button("🔍 Predict Credit Risk"):
 
         risk_category = "🔴 High Risk"
 
+        confidence = "Strong"
+
         message = (
             "This applicant may have a higher "
             "probability of loan default."
         )
 
-    # ---------------- RESULT DISPLAY ---------------- #
+    # ---------------- RESULT UI ---------------- #
 
     st.markdown("---")
 
@@ -258,11 +268,8 @@ if st.button("🔍 Predict Credit Risk"):
         value=risk_category
     )
 
-    st.progress(float(adjusted_prob))
-
     st.markdown(
-        f"### Risk Confidence: "
-        f"**{adjusted_prob:.2%}**"
+        f"### Confidence: **{confidence}**"
     )
 
     st.info(message)
@@ -302,7 +309,7 @@ with st.expander("ℹ️ About This Model"):
 
 This system combines:
 - Machine Learning predictions
-- Financial risk adjustment rules
+- Financial rule-based adjustments
 
 to improve practical credit risk assessment.
 
@@ -311,5 +318,5 @@ to improve practical credit risk assessment.
 # ---------------- FOOTER ---------------- #
 
 st.caption(
-    "Built with Streamlit | AI-Based Credit Risk Prediction System"
+    "🚀 Built with Streamlit | AI-Based Credit Risk Prediction System"
 )

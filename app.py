@@ -1,9 +1,15 @@
 import streamlit as st
 import pandas as pd
-import sys, os
+import sys
+import os
 
-# Fix import path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# ---------------- IMPORT PATH ---------------- #
+
+sys.path.append(
+    os.path.abspath(
+        os.path.join(os.path.dirname(__file__), '..')
+    )
+)
 
 from src.predict import predict, predict_proba
 
@@ -31,8 +37,8 @@ h1, h2, h3 {
 .stButton>button {
     background: linear-gradient(90deg, #00C9FF, #92FE9D);
     color: black;
-    border-radius: 10px;
-    height: 3em;
+    border-radius: 12px;
+    height: 3.2em;
     width: 100%;
     font-weight: bold;
     font-size: 16px;
@@ -57,7 +63,7 @@ st.markdown("---")
 
 col1, col2 = st.columns(2)
 
-# ---------- COLUMN 1 ---------- #
+# ---------------- COLUMN 1 ---------------- #
 
 with col1:
 
@@ -65,7 +71,7 @@ with col1:
 
     person_income = st.number_input(
         "💵 Annual Income",
-        min_value=0.0,
+        min_value=1.0,
         step=1000.0
     )
 
@@ -82,14 +88,15 @@ with col1:
         step=0.1
     )
 
-    loan_percent_income = st.slider(
-        "📊 Loan Percentage of Income (%)",
-        min_value=0.0,
-        max_value=100.0,
-        step=1.0
+    # Automatically calculate loan percentage income
+    loan_percent_income = loan_amnt / person_income
+
+    st.metric(
+        label="📊 Loan Percentage of Income",
+        value=f"{loan_percent_income:.2%}"
     )
 
-# ---------- COLUMN 2 ---------- #
+# ---------------- COLUMN 2 ---------------- #
 
 with col2:
 
@@ -135,20 +142,33 @@ st.markdown("---")
 
 if st.button("🔍 Predict Credit Risk"):
 
-    # Convert percentage to decimal
-    loan_percent_income = loan_percent_income / 100
-
     input_df = pd.DataFrame({
 
         "person_income": [person_income],
-        "person_home_ownership": [person_home_ownership],
+
+        "person_home_ownership": [
+            person_home_ownership
+        ],
+
         "loan_intent": [loan_intent],
+
         "loan_amnt": [loan_amnt],
+
         "loan_int_rate": [loan_int_rate],
-        "loan_percent_income": [loan_percent_income],
+
+        "loan_percent_income": [
+            loan_percent_income
+        ],
+
         "loan_grade": [loan_grade],
-        "cb_person_default_on_file": [cb_person_default_on_file],
-        "cb_person_cred_hist_length": [cb_person_cred_hist_length]
+
+        "cb_person_default_on_file": [
+            cb_person_default_on_file
+        ],
+
+        "cb_person_cred_hist_length": [
+            cb_person_cred_hist_length
+        ]
 
     })
 
@@ -158,7 +178,7 @@ if st.button("🔍 Predict Credit Risk"):
 
     st.markdown("## 📈 Prediction Result")
 
-    # ---------- HIGH RISK ---------- #
+    # ---------------- HIGH RISK ---------------- #
 
     if prediction == 1:
 
@@ -167,15 +187,17 @@ if st.button("🔍 Predict Credit Risk"):
         st.progress(float(probability))
 
         st.markdown(
-            f"### Risk Probability: **{probability:.2%}**"
+            f"### Risk Probability: "
+            f"**{probability:.2%}**"
         )
 
         st.warning("""
-        This applicant may have a higher probability
-        of loan default based on financial and credit attributes.
+        This applicant may have a higher
+        probability of loan default based on
+        financial and credit characteristics.
         """)
 
-    # ---------- LOW RISK ---------- #
+    # ---------------- LOW RISK ---------------- #
 
     else:
 
@@ -184,7 +206,8 @@ if st.button("🔍 Predict Credit Risk"):
         st.progress(float(probability))
 
         st.markdown(
-            f"### Risk Probability: **{probability:.2%}**"
+            f"### Risk Probability: "
+            f"**{probability:.2%}**"
         )
 
         st.info("""
@@ -202,9 +225,9 @@ with st.expander("ℹ️ About This Model"):
 
 ### 🔹 Model Information
 
-- Model Used: XGBoost Classifier
-- Task: Credit Risk Classification
-- Type: Supervised Machine Learning
+- Model: XGBoost Classifier
+- Type: Binary Classification
+- Purpose: Credit Risk Prediction
 
 ### 🔹 Features Used
 
@@ -221,11 +244,11 @@ with st.expander("ℹ️ About This Model"):
 ### 🔹 Pipeline Includes
 
 - Data preprocessing
-- Encoding categorical variables
-- Feature scaling
+- Feature encoding
+- Scaling
 - Model prediction pipeline
 
-### 🔹 Evaluation Metrics
+### 🔹 Performance
 
 - Accuracy: ~93%
 - ROC-AUC Score: ~0.85
@@ -234,4 +257,7 @@ with st.expander("ℹ️ About This Model"):
 
 # ---------------- FOOTER ---------------- #
 
-st.caption("Built with Streamlit | Machine Learning Credit Risk Prediction System")
+st.caption(
+    "Built with Streamlit | "
+    "Machine Learning Credit Risk Prediction System"
+)

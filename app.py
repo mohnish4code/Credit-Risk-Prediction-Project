@@ -138,7 +138,7 @@ with col2:
 
 st.markdown("---")
 
-# ---------------- VALIDATION WARNINGS ---------------- #
+# ---------------- WARNINGS ---------------- #
 
 if loan_percent_income > 0.83:
 
@@ -152,7 +152,7 @@ if loan_amnt > person_income:
 
     st.info(
         "ℹ️ Loan amount exceeds annual income. "
-        "Such cases may carry higher financial risk."
+        "Such loans generally carry higher financial risk."
     )
 
 # ---------------- PREDICTION ---------------- #
@@ -189,18 +189,64 @@ if st.button("🔍 Predict Credit Risk"):
 
     })
 
+    # ---------------- MODEL PROBABILITIES ---------------- #
+
     probabilities = predict_proba(input_df)[0]
 
     low_risk_prob = probabilities[0]
     high_risk_prob = probabilities[1]
 
+    # =====================================================
+    # BUSINESS RULE ADJUSTMENTS
+    # =====================================================
+
+    adjustment_score = 0
+
+    # High loan burden
+    if loan_percent_income > 0.50:
+        adjustment_score += 0.15
+
+    # Extremely high loan burden
+    if loan_percent_income > 0.75:
+        adjustment_score += 0.20
+
+    # Previous default
+    if cb_person_default_on_file == "Y":
+        adjustment_score += 0.20
+
+    # Risky loan grades
+    if loan_grade in ["D", "E", "F", "G"]:
+        adjustment_score += 0.15
+
+    # Very short credit history
+    if cb_person_cred_hist_length <= 2:
+        adjustment_score += 0.10
+
+    # RENT ownership slightly risky
+    if person_home_ownership == "RENT":
+        adjustment_score += 0.05
+
+    # High interest rate
+    if loan_int_rate > 15:
+        adjustment_score += 0.10
+
+    # Venture loans slightly risky
+    if loan_intent == "VENTURE":
+        adjustment_score += 0.05
+
+    # Apply adjustment
+    adjusted_prob = high_risk_prob + adjustment_score
+
+    # Clamp probability
+    adjusted_prob = min(max(adjusted_prob, 0), 1)
+
     # ---------------- RISK CATEGORY ---------------- #
 
-    if high_risk_prob < 0.30:
+    if adjusted_prob < 0.40:
 
         risk_category = "🟢 Low Risk"
 
-    elif high_risk_prob < 0.60:
+    elif adjusted_prob < 0.70:
 
         risk_category = "🟡 Medium Risk"
 
@@ -217,27 +263,27 @@ if st.button("🔍 Predict Credit Risk"):
         value=risk_category
     )
 
-    st.progress(float(high_risk_prob))
+    st.progress(float(adjusted_prob))
 
     st.markdown(
-        f"### High Risk Probability: "
-        f"**{high_risk_prob:.2%}**"
+        f"### Adjusted High Risk Probability: "
+        f"**{adjusted_prob:.2%}**"
     )
 
-    # ---------------- RESULT MESSAGE ---------------- #
+    # ---------------- DETAILED RESULT ---------------- #
 
-    if high_risk_prob < 0.30:
+    if adjusted_prob < 0.40:
 
         st.success("""
         This applicant appears financially safer
-        according to the trained ML model.
+        according to the ML model and financial rules.
         """)
 
-    elif high_risk_prob < 0.60:
+    elif adjusted_prob < 0.70:
 
         st.warning("""
         This applicant shows moderate financial
-        risk characteristics. Further evaluation
+        risk characteristics. Additional review
         may be recommended.
         """)
 
@@ -245,9 +291,49 @@ if st.button("🔍 Predict Credit Risk"):
 
         st.error("""
         This applicant may have a higher probability
-        of loan default based on financial and
-        credit characteristics.
+        of loan default based on ML prediction and
+        financial risk indicators.
         """)
+
+    # ---------------- EXPANDABLE DETAILS ---------------- #
+
+    with st.expander("📋 Risk Analysis Details"):
+
+        st.write(f"Base ML High Risk Probability: {high_risk_prob:.2%}")
+        st.write(f"Business Rule Adjustment: +{adjustment_score:.2%}")
+        st.write(f"Final Adjusted Probability: {adjusted_prob:.2%}")
+
+        st.markdown("### Financial Risk Factors Considered")
+
+        risk_factors = []
+
+        if loan_percent_income > 0.50:
+            risk_factors.append("High loan-to-income burden")
+
+        if cb_person_default_on_file == "Y":
+            risk_factors.append("Previous default history")
+
+        if loan_grade in ["D", "E", "F", "G"]:
+            risk_factors.append("Risky loan grade")
+
+        if cb_person_cred_hist_length <= 2:
+            risk_factors.append("Short credit history")
+
+        if person_home_ownership == "RENT":
+            risk_factors.append("Rental home ownership")
+
+        if loan_int_rate > 15:
+            risk_factors.append("High interest rate")
+
+        if loan_intent == "VENTURE":
+            risk_factors.append("Business/Venture loan purpose")
+
+        if len(risk_factors) == 0:
+            st.success("No major financial risk indicators detected.")
+
+        else:
+            for factor in risk_factors:
+                st.write(f"• {factor}")
 
 st.markdown("---")
 
@@ -260,8 +346,8 @@ with st.expander("ℹ️ About This Model"):
 ### 🔹 Model Information
 
 - Model: XGBoost Classifier
-- Task: Credit Risk Classification
-- Type: Supervised Machine Learning
+- Type: Credit Risk Classification
+- Deployment: Streamlit
 
 ### 🔹 Features Used
 
@@ -272,17 +358,20 @@ with st.expander("ℹ️ About This Model"):
 - Interest Rate
 - Loan Percentage of Income
 - Loan Grade
-- Previous Loan Default
+- Previous Default History
 - Credit History Length
 
-### 🔹 Pipeline Includes
+### 🔹 System Design
 
-- Data preprocessing
-- Encoding categorical variables
-- Feature scaling
-- XGBoost prediction pipeline
+This system combines:
 
-### 🔹 Model Performance
+1. Machine Learning Predictions
+2. Financial Rule-Based Adjustments
+3. Risk Categorization Logic
+
+to improve practical financial risk interpretation.
+
+### 🔹 Evaluation Metrics
 
 - Accuracy: ~93%
 - ROC-AUC Score: ~0.85
@@ -291,15 +380,15 @@ with st.expander("ℹ️ About This Model"):
 
 ### 🔹 Important Note
 
-Predictions may become less reliable
-for unrealistic financial inputs outside
-the training distribution range.
+Predictions are based on patterns learned
+from historical training data and may become
+less reliable for highly unrealistic financial inputs.
 
 """)
 
 # ---------------- FOOTER ---------------- #
 
 st.caption(
-    "Built with Streamlit | "
-    "Machine Learning Credit Risk Prediction System"
+    "🚀 Built with Streamlit | "
+    "AI-Powered Credit Risk Prediction System"
 )

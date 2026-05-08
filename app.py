@@ -1,19 +1,13 @@
 import streamlit as st
 import pandas as pd
-import sys
-import os
+import sys, os
 
-# ---------------- IMPORT PATH ---------------- #
+# ---------------- IMPORT ---------------- #
 
-sys.path.append(
-    os.path.abspath(
-        os.path.join(os.path.dirname(__file__), '..')
-    )
-)
-
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.predict import predict_proba
 
-# ---------------- PAGE CONFIG ---------------- #
+# ---------------- CONFIG ---------------- #
 
 st.set_page_config(
     page_title="Credit Risk Predictor",
@@ -21,7 +15,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# ---------------- CUSTOM CSS ---------------- #
+# ---------------- STYLE ---------------- #
 
 st.markdown("""
 <style>
@@ -30,7 +24,7 @@ st.markdown("""
     background-color: #0E1117;
 }
 
-h1, h2, h3, h4 {
+h1, h2, h3 {
     color: white;
 }
 
@@ -38,20 +32,28 @@ h1, h2, h3, h4 {
     background: linear-gradient(90deg, #00C9FF, #92FE9D);
     color: black;
     border-radius: 12px;
-    height: 3.2em;
+    height: 3em;
     width: 100%;
     font-weight: bold;
     font-size: 16px;
-    border: none;
 }
 
-.stButton>button:hover {
-    opacity: 0.9;
+.result-box {
+    padding: 20px;
+    border-radius: 12px;
+    margin-top: 20px;
 }
 
-.block-container {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
+.low {
+    background-color: #133a2a;
+}
+
+.medium {
+    background-color: #4a3f0b;
+}
+
+.high {
+    background-color: #4a1f1f;
 }
 
 </style>
@@ -60,263 +62,161 @@ h1, h2, h3, h4 {
 # ---------------- TITLE ---------------- #
 
 st.title("💳 Credit Risk Prediction")
-st.markdown(
-    "AI-powered loan risk assessment system"
-)
+st.caption("AI-powered loan risk assessment system")
 
 st.markdown("---")
 
-# ---------------- INPUT SECTION ---------------- #
+# ---------------- INPUT ---------------- #
 
 st.subheader("📋 Applicant Information")
 
 col1, col2 = st.columns(2)
 
-# ---------------- COLUMN 1 ---------------- #
-
 with col1:
-
-    person_income = st.number_input(
-        "💵 Annual Income",
-        min_value=1.0,
-        step=1000.0
-    )
-
-    loan_amnt = st.number_input(
-        "💰 Loan Amount",
-        min_value=0.0,
-        step=500.0
-    )
-
-    loan_int_rate = st.number_input(
-        "📈 Interest Rate (%)",
-        min_value=0.0,
-        max_value=100.0,
-        step=0.1
-    )
-
-    cb_person_cred_hist_length = st.slider(
-        "📅 Credit History Length",
-        min_value=1,
-        max_value=30,
-        value=5
-    )
-
-# ---------------- COLUMN 2 ---------------- #
+    person_income = st.number_input("💵 Annual Income", min_value=1.0, step=1000.0)
+    loan_amnt = st.number_input("💰 Loan Amount", min_value=0.0, step=500.0)
+    loan_int_rate = st.number_input("📈 Interest Rate (%)", min_value=0.0, step=0.1)
+    cb_person_cred_hist_length = st.slider("📅 Credit History Length", 1, 30, 5)
 
 with col2:
-
-    person_home_ownership = st.selectbox(
-        "🏠 Home Ownership",
-        ["RENT", "OWN", "MORTGAGE", "OTHER"]
+    person_home_ownership = st.selectbox("🏠 Home Ownership", ["RENT", "OWN", "MORTGAGE", "OTHER"])
+    loan_intent = st.selectbox("🎯 Loan Purpose",
+        ["PERSONAL","EDUCATION","MEDICAL","VENTURE","HOMEIMPROVEMENT","DEBTCONSOLIDATION"]
     )
+    loan_grade = st.selectbox("🏦 Loan Grade", ["A","B","C","D","E","F","G"])
+    cb_person_default_on_file = st.selectbox("⚠️ Previous Default", ["N","Y"])
 
-    loan_intent = st.selectbox(
-        "🎯 Loan Purpose",
-        [
-            "PERSONAL",
-            "EDUCATION",
-            "MEDICAL",
-            "VENTURE",
-            "HOMEIMPROVEMENT",
-            "DEBTCONSOLIDATION"
-        ]
-    )
-
-    loan_grade = st.selectbox(
-        "🏦 Loan Grade",
-        ["A", "B", "C", "D", "E", "F", "G"]
-    )
-
-    cb_person_default_on_file = st.selectbox(
-        "⚠️ Previous Default",
-        ["N", "Y"]
-    )
-
-# ---------------- DERIVED FEATURE ---------------- #
+# ---------------- DERIVED ---------------- #
 
 loan_percent_income = loan_amnt / person_income
 
 st.markdown("---")
 
-st.metric(
-    label="📊 Loan Percentage of Income",
-    value=f"{loan_percent_income:.2%}"
-)
-
-# ---------------- LIGHT WARNING ---------------- #
+st.metric("📊 Loan % of Income", f"{loan_percent_income:.2%}")
 
 if loan_percent_income > 0.83:
+    st.warning("⚠️ This value is outside most training data range")
 
-    st.warning(
-        "This loan ratio exceeds most training data examples. "
-        "Prediction confidence may be lower."
-    )
-
-# ---------------- PREDICTION ---------------- #
+# ---------------- PREDICT ---------------- #
 
 if st.button("🔍 Predict Credit Risk"):
 
     input_df = pd.DataFrame({
-
         "person_income": [person_income],
-
-        "person_home_ownership": [
-            person_home_ownership
-        ],
-
+        "person_home_ownership": [person_home_ownership],
         "loan_intent": [loan_intent],
-
         "loan_amnt": [loan_amnt],
-
         "loan_int_rate": [loan_int_rate],
-
-        "loan_percent_income": [
-            loan_percent_income
-        ],
-
+        "loan_percent_income": [loan_percent_income],
         "loan_grade": [loan_grade],
-
-        "cb_person_default_on_file": [
-            cb_person_default_on_file
-        ],
-
-        "cb_person_cred_hist_length": [
-            cb_person_cred_hist_length
-        ]
-
+        "cb_person_default_on_file": [cb_person_default_on_file],
+        "cb_person_cred_hist_length": [cb_person_cred_hist_length]
     })
 
-    # ---------------- MODEL PROBABILITY ---------------- #
+    # -------- ML PROBABILITY -------- #
 
-    probabilities = predict_proba(input_df)[0]
+    prob = predict_proba(input_df)[0][1]
 
-    high_risk_prob = probabilities[1]
+    # -------- SOFT ADJUSTMENT -------- #
 
-    # ---------------- SOFT BUSINESS RULES ---------------- #
-
-    adjustment_score = 0
+    adjustment = 0
 
     if loan_percent_income > 0.50:
-        adjustment_score += 0.05
-
+        adjustment += 0.05
     if loan_percent_income > 0.75:
-        adjustment_score += 0.08
-
+        adjustment += 0.08
     if cb_person_default_on_file == "Y":
-        adjustment_score += 0.07
+        adjustment += 0.07
+    if loan_grade in ["D","E","F","G"]:
+        adjustment += 0.05
 
-    if loan_grade in ["D", "E", "F", "G"]:
-        adjustment_score += 0.05
+    adjusted_prob = min(prob + adjustment, 0.95)
 
-    if cb_person_cred_hist_length <= 2:
-        adjustment_score += 0.03
+    # -------- HARD RULE OVERRIDE -------- #
 
-    if person_home_ownership == "RENT":
-        adjustment_score += 0.02
+    if loan_percent_income > 0.75 and cb_person_default_on_file == "Y":
+        risk = "🔴 High Risk"
+        confidence = "Strong"
+        css_class = "high"
 
-    if loan_int_rate > 15:
-        adjustment_score += 0.04
+    elif loan_percent_income > 0.80:
+        risk = "🔴 High Risk"
+        confidence = "High"
+        css_class = "high"
 
-    adjusted_prob = high_risk_prob + adjustment_score
+    elif cb_person_default_on_file == "Y" and loan_grade in ["D","E","F","G"]:
+        risk = "🔴 High Risk"
+        confidence = "High"
+        css_class = "high"
 
-    adjusted_prob = min(adjusted_prob, 0.95)
-
-    # ---------------- RISK CATEGORY ---------------- #
-
-    if adjusted_prob < 0.40:
-
-        risk_category = "🟢 Low Risk"
-
+    elif adjusted_prob < 0.40:
+        risk = "🟢 Low Risk"
         confidence = "Moderate"
-
-        message = (
-            "This applicant appears financially stable "
-            "according to the risk model."
-        )
+        css_class = "low"
 
     elif adjusted_prob < 0.70:
-
-        risk_category = "🟡 Medium Risk"
-
+        risk = "🟡 Medium Risk"
         confidence = "High"
-
-        message = (
-            "This applicant shows moderate "
-            "financial risk characteristics."
-        )
+        css_class = "medium"
 
     else:
-
-        risk_category = "🔴 High Risk"
-
+        risk = "🔴 High Risk"
         confidence = "Strong"
+        css_class = "high"
 
-        message = (
-            "This applicant may have a higher "
-            "probability of loan default."
-        )
-
-    # ---------------- RESULT UI ---------------- #
+    # -------- DISPLAY -------- #
 
     st.markdown("---")
-
     st.subheader("📈 Prediction Result")
 
-    st.metric(
-        label="Risk Category",
-        value=risk_category
-    )
+    st.markdown(f"""
+    <div class="result-box {css_class}">
+        <h2>{risk}</h2>
+        <h4>Confidence: {confidence}</h4>
+    </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown(
-        f"### Confidence: **{confidence}**"
-    )
+    # -------- EXPLANATION -------- #
 
-    st.info(message)
+    reasons = []
 
-# ---------------- ABOUT SECTION ---------------- #
+    if loan_percent_income > 0.75:
+        reasons.append("Very high loan compared to income")
+
+    if cb_person_default_on_file == "Y":
+        reasons.append("Previous loan default")
+
+    if loan_grade in ["D","E","F","G"]:
+        reasons.append("Poor loan grade")
+
+    if loan_int_rate > 15:
+        reasons.append("High interest rate")
+
+    if cb_person_cred_hist_length <= 2:
+        reasons.append("Short credit history")
+
+    if reasons:
+        st.markdown("### ⚠️ Key Risk Factors")
+        for r in reasons:
+            st.write(f"- {r}")
+
+# ---------------- ABOUT ---------------- #
 
 st.markdown("---")
 
 with st.expander("ℹ️ About This Model"):
-
     st.write("""
+    - Model: XGBoost Classifier  
+    - Accuracy: ~93%  
+    - ROC-AUC: ~0.85  
 
-### Model Information
+    This system combines:
+    - Machine Learning predictions  
+    - Financial risk rules  
 
-- Model: XGBoost Classifier
-- Task: Credit Risk Classification
-- Deployment: Streamlit
-
-### Features Used
-
-- Annual Income
-- Loan Amount
-- Interest Rate
-- Home Ownership
-- Loan Purpose
-- Loan Grade
-- Previous Default History
-- Credit History Length
-- Loan Percentage of Income
-
-### Model Performance
-
-- Accuracy: ~93%
-- ROC-AUC Score: ~0.85
-
-### Note
-
-This system combines:
-- Machine Learning predictions
-- Financial rule-based adjustments
-
-to improve practical credit risk assessment.
-
-""")
+    to improve real-world reliability.
+    """)
 
 # ---------------- FOOTER ---------------- #
 
-st.caption(
-    "🚀 Built with Streamlit | AI-Based Credit Risk Prediction System"
-)
+st.caption("Built with Streamlit | Credit Risk ML System")

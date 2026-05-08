@@ -19,14 +19,9 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+.main { background-color: #0E1117; }
 
-.main {
-    background-color: #0E1117;
-}
-
-h1, h2, h3 {
-    color: white;
-}
+h1, h2, h3 { color: white; }
 
 .stButton>button {
     background: linear-gradient(90deg, #00C9FF, #92FE9D);
@@ -44,18 +39,9 @@ h1, h2, h3 {
     margin-top: 20px;
 }
 
-.low {
-    background-color: #133a2a;
-}
-
-.medium {
-    background-color: #4a3f0b;
-}
-
-.high {
-    background-color: #4a1f1f;
-}
-
+.low { background-color: #133a2a; }
+.medium { background-color: #4a3f0b; }
+.high { background-color: #4a1f1f; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -76,7 +62,7 @@ with col1:
     person_income = st.number_input("💵 Annual Income", min_value=1.0, step=1000.0)
     loan_amnt = st.number_input("💰 Loan Amount", min_value=0.0, step=500.0)
     loan_int_rate = st.number_input("📈 Interest Rate (%)", min_value=0.0, step=0.1)
-    cb_person_cred_hist_length = st.slider("📅 Credit History Length", 1, 30, 5)
+    cb_person_cred_hist_length = st.slider("📅 Credit History Length (years)", 1, 30, 5)
 
 with col2:
     person_home_ownership = st.selectbox("🏠 Home Ownership", ["RENT", "OWN", "MORTGAGE", "OTHER"])
@@ -91,11 +77,10 @@ with col2:
 loan_percent_income = loan_amnt / person_income
 
 st.markdown("---")
-
 st.metric("📊 Loan % of Income", f"{loan_percent_income:.2%}")
 
 if loan_percent_income > 0.83:
-    st.warning("⚠️ This value is outside most training data range")
+    st.warning("⚠️ Outside training range — prediction less reliable")
 
 # ---------------- PREDICT ---------------- #
 
@@ -117,44 +102,58 @@ if st.button("🔍 Predict Credit Risk"):
 
     prob = predict_proba(input_df)[0][1]
 
-    # -------- SOFT ADJUSTMENT -------- #
+    # -------- FEATURE-BASED SCORING -------- #
 
-    adjustment = 0
+    risk_score = 0
 
-    if loan_percent_income > 0.50:
-        adjustment += 0.05
+    # Loan burden
     if loan_percent_income > 0.75:
-        adjustment += 0.08
+        risk_score += 3
+    elif loan_percent_income > 0.50:
+        risk_score += 2
+    elif loan_percent_income > 0.30:
+        risk_score += 1
+
+    # Default history
     if cb_person_default_on_file == "Y":
-        adjustment += 0.07
+        risk_score += 3
+
+    # Loan grade
     if loan_grade in ["D","E","F","G"]:
-        adjustment += 0.05
+        risk_score += 2
+    elif loan_grade == "C":
+        risk_score += 1
 
-    adjusted_prob = min(prob + adjustment, 0.95)
+    # Credit history (IMPORTANT FIX)
+    if cb_person_cred_hist_length < 2:
+        risk_score += 2
+    elif cb_person_cred_hist_length < 5:
+        risk_score += 1
+    elif cb_person_cred_hist_length > 15:
+        risk_score -= 1
 
-    # -------- HARD RULE OVERRIDE -------- #
+    # Interest rate
+    if loan_int_rate > 18:
+        risk_score += 2
+    elif loan_int_rate > 12:
+        risk_score += 1
 
-    if loan_percent_income > 0.75 and cb_person_default_on_file == "Y":
-        risk = "🔴 High Risk"
-        confidence = "Strong"
-        css_class = "high"
+    # Home ownership
+    if person_home_ownership == "RENT":
+        risk_score += 1
 
-    elif loan_percent_income > 0.80:
-        risk = "🔴 High Risk"
-        confidence = "High"
-        css_class = "high"
+    # -------- FINAL SCORE -------- #
 
-    elif cb_person_default_on_file == "Y" and loan_grade in ["D","E","F","G"]:
-        risk = "🔴 High Risk"
-        confidence = "High"
-        css_class = "high"
+    final_score = risk_score + (prob * 3)
 
-    elif adjusted_prob < 0.40:
+    # -------- DECISION -------- #
+
+    if final_score <= 2:
         risk = "🟢 Low Risk"
         confidence = "Moderate"
         css_class = "low"
 
-    elif adjusted_prob < 0.70:
+    elif final_score <= 5:
         risk = "🟡 Medium Risk"
         confidence = "High"
         css_class = "medium"
@@ -192,8 +191,8 @@ if st.button("🔍 Predict Credit Risk"):
     if loan_int_rate > 15:
         reasons.append("High interest rate")
 
-    if cb_person_cred_hist_length <= 2:
-        reasons.append("Short credit history")
+    if cb_person_cred_hist_length < 3:
+        reasons.append("Very short credit history")
 
     if reasons:
         st.markdown("### ⚠️ Key Risk Factors")
@@ -210,11 +209,11 @@ with st.expander("ℹ️ About This Model"):
     - Accuracy: ~93%  
     - ROC-AUC: ~0.85  
 
-    This system combines:
+    This system uses:
     - Machine Learning predictions  
-    - Financial risk rules  
+    - Feature-based scoring logic  
 
-    to improve real-world reliability.
+    to provide realistic and explainable decisions.
     """)
 
 # ---------------- FOOTER ---------------- #
